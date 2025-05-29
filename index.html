@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>쿠폰 사용 확인</title>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/NanumMyeongjoEco/NanumMyeongjoEco.css" type="text/css"/>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: #f6f8fa url('./img/bg.png') no-repeat center center fixed;
+      background-size: contain;
+      font-family: 'Nanum Myeongjo Eco', system-ui, sans-serif;
+      min-height: 100vh;
+      height: 100%;
+    }
+    #infoText {
+      padding-top: 12vh;
+      font-size: 2.3vh;
+      text-align: center;
+      color: white;
+      font-family: 'Nanum Myeongjo Eco', serif;
+    }
+    #qrArea {
+      position: fixed;
+      bottom: 10rem;
+      right: 1.5rem;
+    }
+    #imgSave {
+      position: fixed;
+      bottom: 5.5rem;
+      right: 1.5rem;
+      font-size: 1rem;
+      padding: 1rem 1rem;
+      border: none;
+      border-radius: 7px;
+      background: rgb(237, 194, 75);
+      color: #000;
+      cursor: pointer;
+      transition: background 0.2s;
+      z-index: 2;
+    }
+    #imgSave:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+    button {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      font-size: 1rem;
+      padding: 1rem 1rem;
+      border: none;
+      border-radius: 7px;
+      background: rgb(237, 194, 75);
+      color: #000;
+      cursor: pointer;
+      transition: background 0.2s;
+      z-index: 2;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+    .hide { display: none; }
+  </style>
+</head>
+<body>
+  <div id="infoText">
+    <span id="artistName">아티스트</span> 님,<br>
+    튠테이블에 관심 가지고 공연 제안<br>
+    주셔서 진심으로 감사드립니다.<br>
+    작성해주신 제안서는<br>
+    신중하고 정중히 읽겠습니다.<br>
+    <br>
+    제안해주신 모든 분들께<br>
+    개별 회신을 드리진 않습니다.<br>
+    하지만 그 감각과 태도, 마음의 결은<br>
+    기억하겠습니다.<br>
+    <br>
+    감사의 뜻으로 홍세환 소셜라운지<br>
+    샌드위치 쿠폰을 보내드립니다.<br>
+    <br>
+    혹시 언젠가 이곳을 지날 일이 있다면,<br>
+    꼭 이 쿠폰을 꺼내 보여주세요.<br>
+    <br>
+    그날은 제가<br>
+    정중한 한 끼와 따뜻한 환대를 준비하겠습니다.
+  </div>
+  <div id="qrArea"></div>
+  <button id="imgSave">이미지 저장하기</button>
+  <button id="btnUse" class="hide">쿠폰 사용하기</button>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB1baSmBFdgxet4gpqZHUrmcGnS_5X66BQ",
+      authDomain: "hshsociallounge-b592d.firebaseapp.com",
+      projectId: "hshsociallounge-b592d",
+      storageBucket: "hshsociallounge-b592d.firebasestorage.app",
+      messagingSenderId: "483190755672",
+      appId: "1:483190755672:web:81c02180018b6ed0fcd52d",
+      measurementId: "G-JTLFK8N4YM"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const ADMIN_HASH = "hsh";
+
+    function getCouponId() {
+      if (location.search.length > 1) {
+        return decodeURIComponent(location.search.substring(1).trim());
+      }
+      return '';
+    }
+
+    const couponId = getCouponId();
+    const btnUse = document.getElementById('btnUse');
+    const imgSave = document.getElementById('imgSave');
+    const artistNameSpan = document.getElementById('artistName');
+
+    // QR 코드 생성
+    const qrArea = document.getElementById('qrArea');
+    const urlToEncode = window.location.href;
+    new QRCode(qrArea, {
+      text: urlToEncode,
+      width: 128,
+      height: 128,
+      colorDark : "#000000",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.H
+    });
+
+    imgSave.onclick = function() {
+      html2canvas(document.body, {useCORS: true}).then(function(canvas) {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL("image/png");
+        link.download = `coupon_${couponId}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    };
+
+    async function checkCoupon() {
+      if (!couponId) return;
+      try {
+        const doc = await db.collection('coupons').doc(couponId).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+
+        // 아티스트 이름 대입
+        if (data.name && artistNameSpan) {
+          artistNameSpan.textContent = data.name;
+        }
+
+        let expired = false;
+        if (data.expires && data.expires.toDate) {
+          const now = new Date();
+          const exp = data.expires.toDate();
+          if (exp < now) expired = true;
+        }
+        if (expired || data.valid === false) return;
+
+        btnUse.classList.remove('hide');
+        if (data.used === true) {
+          btnUse.textContent = "쿠폰 사용 완료";
+          btnUse.disabled = true;
+          btnUse.onclick = null;
+        } else {
+          btnUse.textContent = "쿠폰 사용하기";
+          btnUse.disabled = false;
+          btnUse.onclick = useCoupon;
+        }
+      } catch (e) {}
+    }
+
+    async function useCoupon() {
+      const pwd = prompt("관리자 암호(hsh)를 입력하세요.");
+      if (pwd === null) return;
+      if (pwd !== ADMIN_HASH) {
+        alert("암호가 올바르지 않습니다.");
+        return;
+      }
+      btnUse.disabled = true;
+      try {
+        await db.collection('coupons').doc(couponId).update({ used: true });
+        btnUse.textContent = "쿠폰 사용 완료";
+        btnUse.disabled = true;
+        btnUse.onclick = null;
+      } catch (e) {
+        btnUse.disabled = false;
+        alert("쿠폰 사용 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
+
+    checkCoupon();
+  </script>
+</body>
+</html>
