@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>쿠폰 전체 관리 (관리자용)</title>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/NanumMyeongjoEco/NanumMyeongjoEco.css" type="text/css"/>
+  <style>
+    body {
+      background: #faf8f3;
+      font-family: 'Nanum Myeongjo Eco', system-ui, sans-serif;
+      margin: 0; padding: 2rem 0;
+    }
+    h2 { text-align:center; margin-bottom:2rem; }
+    .add-form {
+      display: flex; justify-content: center; gap: 1rem; margin-bottom: 2rem;
+      background: #fff9e0; padding: 1.2rem 2rem; border-radius: 12px; box-shadow: 0 2px 8px #0001;
+      align-items: flex-end;
+    }
+    .add-form label { font-weight: bold; }
+    .add-form input {
+      font-size: 1rem; padding: 0.5rem 1rem; border-radius: 7px; border: 1px solid #ccc;
+      background: #fff;
+    }
+    .add-form button {
+      background: #f6de3d; color: #222; font-weight: bold; border: none; border-radius: 7px;
+      font-size: 1rem; padding: 0.6rem 1.5rem; cursor: pointer; transition: background 0.2s;
+    }
+    .add-form button:disabled { opacity: .6; cursor: not-allowed; }
+    table {
+      border-collapse: collapse;
+      margin: 0 auto 2rem auto;
+      min-width: 900px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px #0002;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #eee;
+      padding: 0.7rem 1.2rem;
+      text-align: left;
+      font-size: 1.1rem;
+    }
+    th { background: #f6de3d; }
+    tr:nth-child(even) { background: #faf7e5; }
+    .status-used { color:#d32f2f; font-weight:bold;}
+    .status-unused { color:#1565c0; font-weight:bold;}
+    .status-invalid { color:#777;}
+    #msg {text-align:center; margin-bottom:1.5rem; color:#2e7d32; font-size:1.12rem;}
+    #msg.error {color:#d32f2f;}
+  </style>
+</head>
+<body>
+  <h2>쿠폰 전체 관리 (관리자)</h2>
+  <form class="add-form" id="addForm" autocomplete="off">
+    <label>이름 <input type="text" id="nameInput" maxlength="30" required></label>
+    <label>전화번호 <input type="text" id="phoneInput" maxlength="20" required></label>
+    <button type="submit" id="addBtn">사용자 추가</button>
+  </form>
+  <div id="msg"></div>
+  <div id="dbArea">로딩 중...</div>
+  <script>
+    // Firebase 설정 (본인 값으로 대체)
+    const firebaseConfig = {
+      apiKey: "AIzaSyB1baSmBFdgxet4gpqZHUrmcGnS_5X66BQ",
+      authDomain: "hshsociallounge-b592d.firebaseapp.com",
+      projectId: "hshsociallounge-b592d",
+      storageBucket: "hshsociallounge-b592d.firebasestorage.app",
+      messagingSenderId: "483190755672",
+      appId: "1:483190755672:web:81c02180018b6ed0fcd52d",
+      measurementId: "G-JTLFK8N4YM"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // 사용자 추가 폼
+    const addForm = document.getElementById('addForm');
+    const nameInput = document.getElementById('nameInput');
+    const phoneInput = document.getElementById('phoneInput');
+    const addBtn = document.getElementById('addBtn');
+    const msg = document.getElementById('msg');
+
+    addForm.onsubmit = async function(e) {
+      e.preventDefault();
+      msg.className = "";
+      msg.textContent = "";
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+      if (!name || !phone) {
+        msg.className = "error"; msg.textContent = "이름과 전화번호를 모두 입력해 주세요."; return;
+      }
+      addBtn.disabled = true;
+      try {
+        // Firestore 랜덤ID 문서 추가
+        const docRef = await db.collection('coupons').add({
+          name: name,
+          phone: phone,
+          used: false,
+          createdAt: new Date()
+        });
+        msg.className = "";
+        msg.textContent = `추가 완료! 쿠폰 ID: ${docRef.id}`;
+        nameInput.value = ""; phoneInput.value = "";
+        loadCoupons();
+      } catch (e) {
+        msg.className = "error";
+        msg.textContent = "저장 중 오류: " + e.message;
+      }
+      addBtn.disabled = false;
+    };
+
+    // 쿠폰 전체 조회
+    async function loadCoupons() {
+      const area = document.getElementById('dbArea');
+      try {
+        const snap = await db.collection('coupons').get();
+        if (snap.empty) {
+          area.innerHTML = "<p>데이터가 없습니다.</p>";
+          return;
+        }
+        let html = `<table><tr>
+          <th>쿠폰ID</th>
+          <th>아티스트명</th>
+          <th>전화번호</th>
+          <th>사용여부</th>
+          <th>쿠폰보기</th>
+        </tr>`;
+        snap.forEach(doc => {
+          const d = doc.data();
+          html += `<tr>
+            <td>${doc.id}</td>
+            <td>${d.name || '-'}</td>
+            <td>${d.phone || '-'}</td>
+            <td class="${d.used ? 'status-used' : 'status-unused'}">${d.used ? '사용됨' : '미사용'}</td>
+            <td><a href="https://gaheeyoon.github.io/hongsoracoupon?${doc.id}">이동</a></td>
+          </tr>`;
+        });
+        html += "</table>";
+        area.innerHTML = html;
+      } catch (e) {
+        area.innerHTML = `<p style="color:#d32f2f;">불러오기 오류: ${e.message}</p>`;
+      }
+    }
+    loadCoupons();
+  </script>
+</body>
+</html>
