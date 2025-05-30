@@ -33,7 +33,6 @@
       bottom: 6vh;
       right: 23vw;
     }
-    .hide { display: none; }
   </style>
 </head>
 <body>
@@ -105,39 +104,16 @@
       correctLevel : QRCode.CorrectLevel.H
     });
 
-    qrArea.addEventListener('click', useCoupon);
-
-    async function useCoupon() {
-      if (!couponId) return;
-      try {
-        const doc = await db.collection('coupons').doc(couponId).get();
-        if (!doc.exists) return;
-        const data = doc.data();
-
-        if (data.name && artistNameSpan) {
-          artistNameSpan.textContent = data.name;
-        }
-
-        if (data.used === true) {
-          alert("이미 사용한 쿠폰입니다.");
-          return;
-        }
-
-        const pwd = prompt("관리자 암호를 입력하세요.");
-        if (pwd === null) return;
-        if (pwd !== ADMIN_HASH) {
-          alert("암호가 올바르지 않습니다.");
-          return;
-        }
-
-        await db.collection('coupons').doc(couponId).update({ used: true });
-        alert("쿠폰을 사용했습니다");
-      } catch (e) {
-        alert("쿠폰 사용 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
-      }
-    }
-
-    checkCoupon();
+    qrArea.onclick = function() {
+      html2canvas(document.body, {useCORS: true}).then(function(canvas) {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL("image/png");
+        link.download = `coupon_${couponId}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    };
 
     async function checkCoupon() {
       if (!couponId) return;
@@ -146,15 +122,33 @@
         if (!doc.exists) return;
         const data = doc.data();
 
+        // 아티스트 이름 대입
         if (data.name && artistNameSpan) {
           artistNameSpan.textContent = data.name;
         }
 
+        let expired = false;
+        if (data.expires && data.expires.toDate) {
+          const now = new Date();
+          const exp = data.expires.toDate();
+          if (exp < now) expired = true;
+        }
+        if (expired || data.valid === false) return;
+
+        btnUse.classList.remove('hide');
         if (data.used === true) {
-          console.log("쿠폰은 이미 사용되었습니다.");
+          btnUse.textContent = "쿠폰 사용 완료";
+          btnUse.disabled = true;
+          btnUse.onclick = null;
+        } else {
+          btnUse.textContent = "쿠폰 사용하기";
+          btnUse.disabled = false;
+          btnUse.onclick = useCoupon;
         }
       } catch (e) {}
     }
+
+    checkCoupon();
   </script>
 </body>
 </html>
