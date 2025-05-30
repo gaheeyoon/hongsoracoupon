@@ -91,6 +91,7 @@
 
     const couponId = getCouponId();
     const artistNameSpan = document.getElementById('artistName');
+    let artistNameForFile = 'coupon';
 
     // QR 코드 생성
     const qrArea = document.getElementById('qrArea');
@@ -108,7 +109,8 @@
       html2canvas(document.body, {useCORS: true}).then(function(canvas) {
         const link = document.createElement('a');
         link.href = canvas.toDataURL("image/png");
-        link.download = `coupon_${couponId}.png`;
+        const filename = artistNameForFile ? `coupon_${artistNameForFile}.png` : `coupon.png`;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -122,28 +124,10 @@
         if (!doc.exists) return;
         const data = doc.data();
 
-        // 아티스트 이름 대입
+        // 아티스트 이름 대입 및 파일명용 변수 저장
         if (data.name && artistNameSpan) {
           artistNameSpan.textContent = data.name;
-        }
-
-        let expired = false;
-        if (data.expires && data.expires.toDate) {
-          const now = new Date();
-          const exp = data.expires.toDate();
-          if (exp < now) expired = true;
-        }
-        if (expired || data.valid === false) return;
-
-        btnUse.classList.remove('hide');
-        if (data.used === true) {
-          btnUse.textContent = "쿠폰 사용 완료";
-          btnUse.disabled = true;
-          btnUse.onclick = null;
-        } else {
-          btnUse.textContent = "쿠폰 사용하기";
-          btnUse.disabled = false;
-          btnUse.onclick = useCoupon;
+          artistNameForFile = data.name.replace(/\s+/g, '_');
         }
       } catch (e) {}
     }
